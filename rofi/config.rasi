@@ -1,0 +1,3 @@
+configuration {}
+
+@theme "~/.config/rofi/snazzy-theme.rasi"

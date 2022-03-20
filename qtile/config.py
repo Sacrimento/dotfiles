@@ -24,6 +24,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import os
 import subprocess
 from typing import List  # noqa: F401
 
@@ -52,6 +53,7 @@ class Commands:
     terminal = terminal
     lock = "betterlockscreen -l blur -- --bar-indicator --bar-orientation=vertical --bar-color=00000000 --bar-pos=365:h-129 --bar-base-width=10 --bar-total-width=100"
     slack = "slack"
+
 
 keys = [
     Key([], "XF86AudioRaiseVolume", lazy.spawn("amixer -q set Master 3%+")),
@@ -172,6 +174,33 @@ screens = [
             24,
         ),
     ),
+    Screen(
+        top=bar.Bar(
+            [
+                widget.GroupBox(),
+                widget.Prompt(),
+                widget.WindowName(),
+                widget.Systray(),
+                widget.LaunchBar(progs=[("🔊", "pavucontrol", "audio settings")]),
+                widget.Battery(
+                    format="{percent:2.0%} {hour:d}:{min:02d}",
+                    notify_below=20,
+                ),
+                widget.Clock(format="%a %d/%m/%Y %H:%M"),
+                widget.LaunchBar(
+                    progs=[
+                        (
+                            "logout",
+                            "qshell:self.qtile.cmd_shutdown()",
+                            "logout from qtile",
+                        ),
+                        ("shutdown", "shutdown now", "shutdown"),
+                    ]
+                ),
+            ],
+            24,
+        ),
+    ),
 ]
 
 # Drag floating layouts.
@@ -204,6 +233,7 @@ floating_layout = layout.Floating(
         Match(wm_class="ssh-askpass"),  # ssh-askpass
         Match(wm_class="blueman-manager"),
         Match(wm_class="keepassxc"),
+        Match(wm_class="pavucontrol"),
         Match(title="branchdialog"),  # gitk
         Match(title="pinentry"),  # GPG key password entry
     ],
@@ -221,8 +251,9 @@ wmname = "LG3D"
 
 @hook.subscribe.startup_once
 def autostart():
-    home = os.path.expanduser('~')
-    subprocess.call([home + '/.config/qtile/autostart.sh'])
+    home = os.path.expanduser("~")
+    subprocess.call([home + "/.config/qtile/autostart.sh"])
+
 
 @hook.subscribe.client_new
 def dialogs(window):
