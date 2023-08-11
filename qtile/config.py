@@ -28,10 +28,12 @@ import os
 import subprocess
 from typing import List  # noqa: F401
 
-from libqtile import bar, hook, layout, widget
-from libqtile.config import Click, Drag, Group, Key, Match, Screen
+from libqtile import hook, layout
+from libqtile.config import Click, Drag, Group, Key, Match
 from libqtile.lazy import lazy
 from libqtile.utils import guess_terminal
+
+from screens import get_screens
 
 grey = "686868"
 red = "FF5C57"
@@ -43,15 +45,14 @@ white = "F1F1F0"
 
 MOD = "mod4"
 ALT = "mod1"
-terminal = guess_terminal()
 
 
 class Commands:
     menu = "rofi -show run"
     menu_desktop = "rofi -modi drun -show"
     browser = "firefox"
-    terminal = terminal
-    lock = "betterlockscreen -l blur -- --bar-indicator --bar-orientation=vertical --bar-color=00000000 --bar-pos=365:h-129 --bar-base-width=10 --bar-total-width=100"
+    terminal = guess_terminal()
+    lock = "loginctl lock-session"
     slack = "slack"
 
 
@@ -92,7 +93,9 @@ keys = [
         desc="Spawn a command using a prompt widget",
     ),
     Key([MOD], "z", lazy.window.kill(), desc="Kill focused window"),
-    Key([MOD], "Return", lazy.spawn(terminal), desc="Launch terminal"),
+    Key([MOD], "w", lazy.window.kill(), desc="Kill focused window"),
+    Key([MOD], "Print", lazy.spawn("flameshot gui")),
+    Key([MOD], "Return", lazy.spawn(Commands.terminal), desc="Launch terminal"),
     Key([MOD, "control"], "r", lazy.reload_config(), desc="Reload the config"),
     Key([MOD], "Delete", lazy.spawn(Commands.lock), desc="Lock the screen"),
     Key([MOD], "Tab", lazy.layout.next()),
@@ -100,12 +103,12 @@ keys = [
 ]
 
 _group_conf = {
-    "WEB": {"key": "ampersand", "apps": ("firefox",), "layout": "max"},
-    "TERM": {"key": "eacute", "apps": tuple()},
-    "CODE": {"key": "quotedbl", "apps": ("code",), "layout": "max"},
-    "SLA": {"key": "apostrophe", "apps": ("slack",), "layout": "max"},
-    "ZOOM": {"key": "o", "apps": ("zoom",)},
-    "VBOX": {"key": "p", "apps": ("VirtualBox Manager",)},
+    "WEB": {"keys": ("ampersand", "1"), "apps": ("firefox",), "layout": "max"},
+    "TERM": {"keys": ("eacute", "2"), "apps": ()},
+    "CODE": {"keys": ("quotedbl", "3"), "apps": ("code",), "layout": "max"},
+    "SLA": {"keys": ("apostrophe", "4"), "apps": ("slack",), "layout": "max"},
+    "SPO": {"keys": ("o",), "apps": ()},
+    "WTE": {"keys": ("p",), "apps": ()},
 }
 
 groups = []
@@ -117,25 +120,19 @@ for name, conf in _group_conf.items():
             layout=conf.get("layout", "monadtall"),
         )
     )
-    keys.extend(
-        [
-            # MOD1 + letter of group = switch to group
-            Key([MOD], conf["key"], lazy.group[name].toscreen()),
-            # MOD1 + shift + letter of group = switch to & move focused window to group
-            Key([MOD, "shift"], conf["key"], lazy.window.togroup(name)),
-        ]
-    )
-
-_layout_theme = {
-    "border_width": 2,
-    "margin": 7,
-    "border_focus": blue,
-    "border_normal": grey,
-}
+    for key in conf["keys"]:
+        keys.extend(
+            [
+                # MOD1 + letter of group = switch to group
+                Key([MOD], key, lazy.group[name].toscreen()),
+                # MOD1 + shift + letter of group = switch to & move focused window to group
+                Key([MOD, "shift"], key, lazy.window.togroup(name)),
+            ]
+        )
 
 layouts = [
-    layout.MonadTall(**_layout_theme),
-    layout.Max(**_layout_theme),
+    layout.MonadTall(border_width=2, margin=7, border_focus=blue, border_normal=grey),
+    layout.Max(),
 ]
 
 widget_defaults = dict(
@@ -145,63 +142,7 @@ widget_defaults = dict(
 )
 extension_defaults = widget_defaults.copy()
 
-
-screens = [
-    Screen(
-        top=bar.Bar(
-            [
-                widget.GroupBox(),
-                widget.Prompt(),
-                widget.WindowName(),
-                widget.Systray(),
-                widget.LaunchBar(progs=[("🔊", "pavucontrol", "audio settings")]),
-                widget.Battery(
-                    format="{percent:2.0%} {hour:d}:{min:02d}",
-                    notify_below=20,
-                ),
-                widget.Clock(format="%a %d/%m/%Y %H:%M"),
-                widget.LaunchBar(
-                    progs=[
-                        (
-                            "logout",
-                            "qshell:self.qtile.cmd_shutdown()",
-                            "logout from qtile",
-                        ),
-                        ("shutdown", "shutdown now", "shutdown"),
-                    ]
-                ),
-            ],
-            24,
-        ),
-    ),
-    Screen(
-        top=bar.Bar(
-            [
-                widget.GroupBox(),
-                widget.Prompt(),
-                widget.WindowName(),
-                widget.Systray(),
-                widget.LaunchBar(progs=[("🔊", "pavucontrol", "audio settings")]),
-                widget.Battery(
-                    format="{percent:2.0%} {hour:d}:{min:02d}",
-                    notify_below=20,
-                ),
-                widget.Clock(format="%a %d/%m/%Y %H:%M"),
-                widget.LaunchBar(
-                    progs=[
-                        (
-                            "logout",
-                            "qshell:self.qtile.cmd_shutdown()",
-                            "logout from qtile",
-                        ),
-                        ("shutdown", "shutdown now", "shutdown"),
-                    ]
-                ),
-            ],
-            24,
-        ),
-    ),
-]
+screens = get_screens()
 
 # Drag floating layouts.
 mouse = [
@@ -247,6 +188,26 @@ reconfigure_screens = True
 # focus, should we respect this or not?
 auto_minimize = True
 wmname = "LG3D"
+
+
+# Weird GNOME issue
+# @hook.subscribe.startup
+# def dbus_register():
+#     id = os.environ.get("DESKTOP_AUTOSTART_ID")
+#     if not id:
+#         return
+#     subprocess.Popen(
+#         [
+#             "dbus-send",
+#             "--session",
+#             "--print-reply",
+#             "--dest=org.gnome.SessionManager",
+#             "/org/gnome/SessionManager",
+#             "org.gnome.SessionManager.RegisterClient",
+#             "string:qtile",
+#             "string:" + id,
+#         ]
+# )
 
 
 @hook.subscribe.startup_once
